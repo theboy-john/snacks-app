@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext'
 import { Link } from 'react-router-dom'
 import SnackCard from '../components/SnackCard'
 import { motion } from 'framer-motion'
+import { collection, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore'
 
 function SkeletonCard() {
   return (
@@ -28,20 +29,22 @@ function MenuPage() {
   const [shopLoading, setShopLoading] = useState(true)
   const { addToCart, totalItems } = useCart()
 
-  useEffect(() => {
-    async function fetchData() {
-      const [snapshotSnacks, shopSnap] = await Promise.all([
-        getDocs(collection(db, 'snacks')),
-        getDoc(doc(db, 'settings', 'shop'))
-      ])
-      const data = snapshotSnacks.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      setSnacks(data.filter(s => s.available))
-      if (shopSnap.exists()) setShopOpen(shopSnap.data().isOpen)
-      setShopLoading(false)
-      setLoading(false)
-    }
-    fetchData()
-  }, [])
+ useEffect(() => {
+  async function fetchSnacks() {
+    const snapshot = await getDocs(collection(db, 'snacks'))
+    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    setSnacks(data.filter(s => s.available))
+    setLoading(false)
+  }
+  fetchSnacks()
+
+  // Listen to shop status in real time
+  const unsub = onSnapshot(doc(db, 'settings', 'shop'), snap => {
+    if (snap.exists()) setShopOpen(snap.data().isOpen)
+    setShopLoading(false)
+  })
+  return () => unsub()
+}, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
